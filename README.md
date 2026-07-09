@@ -80,6 +80,20 @@ Hyperparameter candidates are fit only on training items. Validation retrieval
 selects the configuration; the selected configuration is then refit on the
 training items and evaluated on the held-out test split.
 
+## Outputs
+
+Each dataset produces a checkpoint archive under `CHECKPOINT_PATH_PREFIX`.
+Stages stored inside an archive include:
+
+- `sbert:*`: dense item embeddings and baseline retrieval metrics.
+- `sae:*` / `dsae:*`: trained sparse autoencoder state, sparse embeddings, and
+  retrieval metrics.
+- `dae:*` / `vae:*`: trained model state, dense adapted embeddings, and
+  retrieval metrics.
+
+The checkpoint manifest records stage metadata and metrics. Existing completed
+stages are skipped, so commands can be rerun without recomputing prior work.
+
 ## Reported results
 
 The table below reports NDCG@20 (N@20) and Recall@20 (R@20) across three
@@ -158,20 +172,3 @@ best result for a dataset, embedding model, and metric.
 | Amazon Video Games | D-SAE | **0.0542** | 0.1018 | **0.0527** | **0.1014** | **0.0426** | **0.0839** |
 
 </details>
-
-The table can be regenerated from its LaTeX source with
-`python latex_table_to_markdown.py path/to/results.tex --output results.md`.
-
-## Outputs
-
-Each dataset produces a checkpoint archive under `CHECKPOINT_PATH_PREFIX`.
-Stages stored inside an archive include:
-
-- `sbert:*`: dense item embeddings and baseline retrieval metrics.
-- `sae:*` / `dsae:*`: trained sparse autoencoder state, sparse embeddings, and
-  retrieval metrics.
-- `dae:*` / `vae:*`: trained model state, dense adapted embeddings, and
-  retrieval metrics.
-
-The checkpoint manifest records stage metadata and metrics. Existing completed
-stages are skipped, so commands can be rerun without recomputing prior work.
