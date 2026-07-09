@@ -1,16 +1,3 @@
-"""Training utilities for :class:`compresso.nn.TopKSAE`.
-
-The objects in this module provide a small, sklearn-like API around the
-low-level ``TopKSAE`` module:
-
->>> trainer = TopKSAETrainer(TopKSAEConfig(k=32, epochs=100))
->>> srp = trainer.fit_transform(embeddings)
-
-The trainer intentionally optimizes for dense embedding matrices that already
-fit in memory. It avoids ``torch.utils.data.DataLoader`` overhead and uses a
-simple batch dataset that returns full batches directly.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

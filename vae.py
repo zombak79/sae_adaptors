@@ -1,18 +1,3 @@
-"""Training utilities for a beta-VAE over dense embeddings.
-
-The objects in this module provide a small, sklearn-like API around a beta-VAE:
-
->>> trainer = BetaVAETrainer(BetaVAEConfig(latent_dim=256, beta_kl=1e-3))
->>> dense_domain_embeddings = trainer.fit_transform(embeddings)
-
-The trainer intentionally optimizes for dense embedding matrices that already
-fit in memory. It avoids ``torch.utils.data.DataLoader`` overhead and uses a
-simple batch dataset that returns full batches directly.
-
-For retrieval/recommendation, ``transform`` returns the encoder mean ``mu`` by
-default, not a sampled latent vector.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass

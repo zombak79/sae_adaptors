@@ -1,16 +1,3 @@
-"""Training utilities for a denoising autoencoder over dense embeddings.
-
-The objects in this module provide a small, sklearn-like API around a simple
-denoising autoencoder:
-
->>> trainer = DAETrainer(DAEConfig(latent_dim=256, epochs=100))
->>> dense_domain_embeddings = trainer.fit_transform(embeddings)
-
-The trainer intentionally optimizes for dense embedding matrices that already
-fit in memory. It avoids ``torch.utils.data.DataLoader`` overhead and uses a
-simple batch dataset that returns full batches directly.
-"""
-
 from __future__ import annotations
 
 from dataclasses import dataclass
