@@ -1,5 +1,6 @@
 from utils import *
 
-checkpoints=build_checkpoints(CONFIG)
+config = load_experiment_config()
+checkpoints = build_checkpoints(config.CONFIG, config.CHECKPOINT_PATH_PREFIX)
 
 print(gather_stats(checkpoints))

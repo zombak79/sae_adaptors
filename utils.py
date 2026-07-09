@@ -1,9 +1,12 @@
+import argparse
+import importlib.util
+from itertools import product
 from pathlib import Path
+from types import ModuleType
 import numpy as np
 import pandas as pd
 import torch
 
-from compresso import TopKSAETrainer, TopKSAEConfig, L1Normalize
 from compresso.io import save_srp_tensor
 
 from compresso_recsys.checkpoint import read_checkpoint, load_recsys_split
@@ -14,123 +17,33 @@ from sentence_transformers import SentenceTransformer
 
 from dae import DAETrainer, DAEConfig
 from vae import BetaVAETrainer, BetaVAEConfig
-
-CHECKPOINT_PATH_PREFIX = "artifacts"
-
-AMAZON_CONFIG = {
-            "--split_mode": "item_split",
-            "--metadata_text_fields": "title,features,description,categories",
-            "--min_entity_text_words": "20",
-            "--min_user_support": "10",
-            "--item_min_support": "10",
-            "--min_value_to_keep": "1.0",
-            "--set_all_values_to": "1.0",
-            "--min_source_items": "1",
-            "--min_target_items": "1",
-            "--annotation_source": "none",
-}
+from sae import TopKSAETrainer, TopKSAEConfig
 
 
-CONFIG = {
-    "GoodBooks10k": {
-        "dataset": "goodbooks",
-        "--split_mode": "item_split",
-        "--min_user_support": "5",
-        "--item_min_support": "1",
-        "--min_value_to_keep": "4.0",
-        "--set_all_values_to": "1.0",
-        "--min_entity_text_words": "20",
-    },
-    "MovieLens20M": {
-        "dataset": "ml20m",
-        "--split_mode": "item_split",
-        "--min_user_support": "5",
-        "--item_min_support": "1",
-        "--min_value_to_keep": "4.0",
-        "--set_all_values_to": "1.0",
-        "--min_entity_text_words": "20",
-    },
-    "Books": AMAZON_CONFIG | {
-        "dataset": "amazon2023",
-        "amazon_category": "Books",
-    },
-    "Electronics": AMAZON_CONFIG | {
-        "dataset": "amazon2023",
-        "amazon_category": "Electronics",
-    },
-    "Toys_and_Games": AMAZON_CONFIG | {
-        "dataset": "amazon2023",
-        "amazon_category": "Toys_and_Games",
-    },
-    "Video_Games": AMAZON_CONFIG | {
-        "dataset": "amazon2023",
-        "amazon_category": "Video_Games",
-    },
-    "Automotive": AMAZON_CONFIG | {
-        "dataset": "amazon2023",
-        "amazon_category": "Automotive",
-    },
-    "Baby_Products": AMAZON_CONFIG | {
-        "dataset": "amazon2023",
-        "amazon_category": "Baby_Products",
-    },
-    "Beauty_and_Personal_Care": AMAZON_CONFIG | {
-        "dataset": "amazon2023",
-        "amazon_category": "Beauty_and_Personal_Care",
-    },
-    
-    "Clothing_Shoes_and_Jewelry": AMAZON_CONFIG | {
-        "dataset": "amazon2023",
-        "amazon_category": "Clothing_Shoes_and_Jewelry",
-    },
-    "Grocery_and_Gourmet_Food": AMAZON_CONFIG | {
-        "dataset": "amazon2023",
-        "amazon_category": "Grocery_and_Gourmet_Food",
-    },
-    "Health_and_Household": AMAZON_CONFIG | {
-        "dataset": "amazon2023",
-        "amazon_category": "Health_and_Household",
-    },
-    "Office_Products": AMAZON_CONFIG | {
-        "dataset": "amazon2023",
-        "amazon_category": "Office_Products",
-    },
-    "Sports_and_Outdoors": AMAZON_CONFIG | {
-        "dataset": "amazon2023",
-        "amazon_category": "Sports_and_Outdoors",
-    },
-}
+def load_experiment_config(argv: list[str] | None = None) -> ModuleType:
+    """Load a Python experiment config selected by ``--config``."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path(__file__).with_name("config.py"),
+        help="Path to a Python experiment configuration file.",
+    )
+    args = parser.parse_args(argv)
+    config_path = args.config.expanduser().resolve()
+    if not config_path.is_file():
+        parser.error(f"config file not found: {config_path}")
 
-sae_config = {
-    "epochs": [50,100,200],
-    "decay": [True, False],
-    "lr": [1e-3, 5e-3, 1e-2],
-    "hidden_dim" : 8192,
-    "k": 128,
-    "batch_size": 1024,
-    "post_sparsify": L1Normalize(),
-    "sparsify_score_mode": "abs",
-    "sparsify_ste_alpha": 0.01,
-    "device": "cuda:0",
-}
+    spec = importlib.util.spec_from_file_location("sae_adaptors_experiment_config", config_path)
+    if spec is None or spec.loader is None:
+        parser.error(f"could not load config file: {config_path}")
+    config = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(config)
 
-dae_config = {
-    "epochs": [50,100,200],
-    "decay": [True, False],
-    "lr": [1e-3, 5e-3, 1e-2],
-    "latent_dim" : 256,
-    "device": "cuda:0",
-}
-
-#latent_dim=256, beta_kl=1e-6,epochs=200, decay=True, lr=1e-3
-vae_config = {
-    "epochs": [50,100,200],
-    "decay": [True, False],
-    "lr": [1e-3, 5e-3, 1e-2],
-    "latent_dim" : 256,
-    "beta_kl": 1e-6,
-    "device": "cuda:0",
-}
+    for name in ("CONFIG", "CHECKPOINT_PATH_PREFIX", "DEVICE"):
+        if not hasattr(config, name):
+            parser.error(f"config file must define {name}")
+    return config
 
 def eval_three_metrics(item_embeddings, source_indices, target_indices, batch_size=1024, show_progress=True):
     out = {}
@@ -146,7 +59,7 @@ def eval_three_metrics(item_embeddings, source_indices, target_indices, batch_si
         out.update({kk: vv for kk, vv in metrics.items() if kk != "n_eval_users"})
     return out
 
-def build_checkpoints(config):
+def build_checkpoints(config, checkpoint_path_prefix):
     import sys
     from compresso_recsys.scripts.build_checkpoint import main
 
@@ -163,7 +76,7 @@ def build_checkpoints(config):
                 if x[:2] == "--":
                     params+=[x,y]
     
-            checkpoint = Path(f"{CHECKPOINT_PATH_PREFIX}/{k}.zip")
+            checkpoint = Path(checkpoint_path_prefix) / f"{k}.zip"
             params+=["--checkpoint_path", str(checkpoint)]
     
             if not checkpoint.exists():
@@ -194,85 +107,7 @@ def gather_stats(checkpoints):
     return pd.DataFrame([[k,v["n_users"], v["n_items"], v["n_interactions"]] for k,v in checkpoints.items()], columns=["Dataset", "Users", "Items", "Interactions"])
 
 
-def gather_results(checkpoints):
-    rows = []
-
-    def _stage_model(stage_name):
-        if stage_name.startswith("sbert"):
-            return "sbert"
-        if stage_name.startswith("sae:"):
-            return "sae"
-        if stage_name.startswith("dae:"):
-            return "dae"
-        if stage_name.startswith("vae:"):
-            return "vae"
-        return stage_name.split(":", 1)[0]
-
-    def _stage_sbert_name(stage_name, stage_info):
-        if stage_name.startswith("sbert"):
-            return stage_info.get("model_name", stage_name.replace("sbert:", ""))
-        base_stage = stage_info.get("base_stage", "")
-        if base_stage.startswith("sbert"):
-            return base_stage.replace("sbert:", "")
-        return base_stage
-
-    def _flatten_metrics(metrics):
-        if not isinstance(metrics, dict):
-            return {}
-        return {k: v for k, v in metrics.items() if isinstance(v, (int, float, np.integer, np.floating))}
-
-    def _metrics_from_stage_file(root, stage_name, model):
-        path = root / stage_name / "metrics.json"
-        if not path.exists():
-            return {}
-
-        stage_metrics = load_json(root, f"{stage_name}/metrics.json")
-        metrics = {}
-
-        # Current stages store their evaluation under model-specific keys,
-        # while some baseline stages use "test_metrics".
-        metric_keys = [
-            "test_metrics",
-            "sae_metrics",
-            "dae_metrics",
-            "vae_metrics",
-            f"{model}_metrics",
-            "metrics",
-        ]
-        for key in metric_keys:
-            metrics.update(_flatten_metrics(stage_metrics.get(key)))
-
-        # Keep this permissive so future flat numeric metrics are picked up too.
-        metrics.update(_flatten_metrics(stage_metrics))
-        return metrics
-
-    for dataset, checkpoint in checkpoints.items():
-        path = checkpoint["path"] if isinstance(checkpoint, dict) else checkpoint
-        with read_checkpoint(path) as root:
-            manifest = load_json(root, "manifest.json")
-
-            for stage_name, stage_info in manifest.get("stages", {}).items():
-                model = _stage_model(stage_name)
-                if model not in {"sbert", "sae", "dae", "vae"}:
-                    continue
-
-                metrics = _metrics_from_stage_file(root, stage_name, model)
-                metrics.update(_flatten_metrics(stage_info.get("metrics")))
-
-                row = {
-                    "dataset": dataset,
-                    "sbert_name": _stage_sbert_name(stage_name, stage_info),
-                    "model": model,
-                    "stage": stage_name,
-                    "base_stage": stage_info.get("base_stage", None),
-                }
-                row.update(metrics)
-                rows.append(row)
-
-    return pd.DataFrame(rows)
-
-
-def train_and_eval_sbert(checkpoint, sbert_name, sbert=None):
+def train_and_eval_sbert(checkpoint, sbert_name, sbert=None, device="cuda"):
     SBERT_DIR = f"sbert:{sbert_name.replace('/', '_')}"
     with read_checkpoint(checkpoint["path"]) as root:
         if (root / SBERT_DIR).is_dir():
@@ -293,7 +128,7 @@ def train_and_eval_sbert(checkpoint, sbert_name, sbert=None):
         test_target_indices = split["test_target_indices"]
 
     if sbert is None:
-        model = SentenceTransformer(sbert_name, device="cuda")
+        model = SentenceTransformer(sbert_name, device=device)
     else:
         model = sbert
         
@@ -350,20 +185,19 @@ def train_and_eval_sbert(checkpoint, sbert_name, sbert=None):
     
 
 def build_grid(config):
-    grid_params = {}
-    params = {}
-    for k in config.keys():
-        if isinstance(config[k], list):
-            grid_params[k] = config[k]
-        else:
-            params[k] = config[k]
-    df = pd.DataFrame([params])
-    for key, values in grid_params.items():
-        df = df.merge(pd.DataFrame({key: values}), how="cross")
-    return [df.iloc[i].to_dict()|params for i in range(len(df))]
+    """Return the Cartesian product of all list-valued hyperparameters."""
+    grid_params = {key: value for key, value in config.items() if isinstance(value, list)}
+    fixed_params = {key: value for key, value in config.items() if key not in grid_params}
+    if not grid_params:
+        return [fixed_params]
+    keys = list(grid_params)
+    return [
+        fixed_params | dict(zip(keys, values))
+        for values in product(*(grid_params[key] for key in keys))
+    ]
 
 
-def train_and_eval_sae(checkpoint, grid):
+def train_and_eval_sae(checkpoint, grid, prefix="sae"):
     with read_checkpoint(checkpoint) as root:    
         split = load_recsys_split(root)
     
@@ -386,9 +220,9 @@ def train_and_eval_sae(checkpoint, grid):
     sbert_dirs = [x for x in manifest['stages'].keys() if x[:5] == 'sbert']
     
     for sbert_dir in sbert_dirs:
-        print(f"Evaluating {sbert_dir}.")
-        sae_dir = f"sae:{sbert_dir}"
         
+        sae_dir = f"{prefix}:{sbert_dir}"
+        print(f"Evaluating {sbert_dir} - {sae_dir}.")
         with read_checkpoint(checkpoint) as root:
             if (root / sae_dir).is_dir():
                 print(f"SAE dir {sae_dir} already exists, skipping.")
@@ -453,8 +287,6 @@ def train_and_eval_sae(checkpoint, grid):
             print("Test metrics:")
             print(metrics)
             
-            sae_dir = f"sae:{sbert_dir}"
-            
             with update_checkpoint(checkpoint) as root:
                 stage_dir = root / sae_dir
                 stage_dir.mkdir(parents=True, exist_ok=True)
@@ -495,6 +327,7 @@ def train_and_eval_sae(checkpoint, grid):
                             if sae.cfg.post_sparsify is not None
                             else None
                         ),
+                        "winning_conf": {k:str(v) for k,v in winning_conf.items()},
                     },
                 )
             
@@ -767,3 +600,84 @@ def train_and_eval_vae(checkpoint, grid):
                     "embedding_dim": int(vae_embeddings.shape[1]),
                 },
             )
+
+
+def gather_results(checkpoints):
+    rows = []
+
+    def _stage_model(stage_name):
+        if stage_name.startswith("sbert"):
+            return "sbert"
+        if stage_name.startswith("sae:"):
+            return "sae"
+        if stage_name.startswith("dae:"):
+            return "dae"
+        if stage_name.startswith("vae:"):
+            return "vae"
+        if stage_name.startswith("dsae:"):
+            return "dsae"
+        return stage_name.split(":", 1)[0]
+
+    def _stage_sbert_name(stage_name, stage_info):
+        if stage_name.startswith("sbert"):
+            return stage_info.get("model_name", stage_name.replace("sbert:", ""))
+        base_stage = stage_info.get("base_stage", "")
+        if base_stage.startswith("sbert"):
+            return base_stage.replace("sbert:", "")
+        return base_stage
+
+    def _flatten_metrics(metrics):
+        if not isinstance(metrics, dict):
+            return {}
+        return {k: v for k, v in metrics.items() if isinstance(v, (int, float, np.integer, np.floating))}
+
+    def _metrics_from_stage_file(root, stage_name, model):
+        path = root / stage_name / "metrics.json"
+        if not path.exists():
+            return {}
+
+        stage_metrics = load_json(root, f"{stage_name}/metrics.json")
+        metrics = {}
+
+        # Current stages store their evaluation under model-specific keys,
+        # while some baseline stages use "test_metrics".
+        metric_keys = [
+            "test_metrics",
+            "sae_metrics",
+            "dae_metrics",
+            "vae_metrics",
+            "dsae_metrics",
+            f"{model}_metrics",
+            "metrics",
+        ]
+        for key in metric_keys:
+            metrics.update(_flatten_metrics(stage_metrics.get(key)))
+
+        # Keep this permissive so future flat numeric metrics are picked up too.
+        metrics.update(_flatten_metrics(stage_metrics))
+        return metrics
+
+    for dataset, checkpoint in checkpoints.items():
+        path = checkpoint["path"] if isinstance(checkpoint, dict) else checkpoint
+        with read_checkpoint(path) as root:
+            manifest = load_json(root, "manifest.json")
+
+            for stage_name, stage_info in manifest.get("stages", {}).items():
+                model = _stage_model(stage_name)
+                if model not in {"sbert", "sae", "dae", "vae", "dsae"}:
+                    continue
+
+                metrics = _metrics_from_stage_file(root, stage_name, model)
+                metrics.update(_flatten_metrics(stage_info.get("metrics")))
+
+                row = {
+                    "dataset": dataset,
+                    "sbert_name": _stage_sbert_name(stage_name, stage_info),
+                    "model": model,
+                    "stage": stage_name,
+                    "base_stage": stage_info.get("base_stage", None),
+                }
+                row.update(metrics)
+                rows.append(row)
+
+    return pd.DataFrame(rows)

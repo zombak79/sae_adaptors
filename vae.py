@@ -806,6 +806,15 @@ class BetaVAETrainer:
         load_optimizer: bool = True,
     ) -> "BetaVAETrainer":  # type: ignore[override]
         """Load a state dictionary produced by :meth:`state_dict`."""
+        saved_config = state.get("config")
+        if saved_config is not None:
+            if not isinstance(saved_config, BetaVAEConfig):
+                raise TypeError("state config must be a BetaVAEConfig")
+            if self.is_built and self.cfg != saved_config:
+                raise ValueError("cannot load a different configuration into an already built trainer")
+            self.cfg = saved_config
+            self.device = torch.device(self.cfg.device)
+
         input_dim = int(state["input_dim"])
         self.build(input_dim)
 

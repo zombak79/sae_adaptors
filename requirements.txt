@@ -1,0 +1,18 @@
+# Core numerical and model stack
+torch>=2.1
+numpy>=1.26
+pandas>=2.0
+
+# Text embedding models
+sentence-transformers>=3.0
+
+# Sparse representations and recommender checkpoint pipeline
+compresso-pytorch>=0.1.0
+compresso-recsys>=0.1.0
+
+# Required when building and reading recommender checkpoints
+scipy>=1.11
+pyarrow>=14.0
+
+# Optional progress bars used when available
+tqdm>=4.0
