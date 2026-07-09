@@ -6,8 +6,7 @@ learned with SentenceTransformers and then transformed with sparse or dense
 autoencoders before retrieval evaluation.
 
 Implemented adaptors include a Top-K sparse autoencoder (SAE), denoising SAE,
-denoising autoencoder (DAE), beta-VAE, and residual-quantized VAE (RQ-VAE).
-The supplied experiment runners cover the first four methods.
+denoising autoencoder (DAE), and beta-VAE.
 
 ## Installation
 
