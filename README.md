@@ -1,4 +1,4 @@
-# Sparse Autoencoders are Unsupervised Semantic Domain Adaptors for Recommender Systems
+# Sparse Autoencoders as Unsupervised Semantic Domain Adaptors for Recommender Systems
 
 This repository accompanies an anonymous research submission. It evaluates
 embedding adaptors for cold-start recommendation: item-text embeddings are
