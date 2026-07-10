@@ -18,11 +18,6 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-The project uses the published `compresso-pytorch` and `compresso-recsys`
-packages for sparse representations, dataset preparation, checkpoint storage,
-and retrieval evaluation. PyTorch device support depends on the installed
-PyTorch build; configure the desired device in an experiment configuration.
-
 ## Experiment configuration
 
 Experiments are controlled by Python configuration files. `config.py` is the
