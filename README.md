@@ -95,8 +95,8 @@ The table below reports NDCG@20 (N@20) and Recall@20 (R@20) across three
 pretrained embedding models. Higher values are better; bold values are the
 best result for a dataset, embedding model, and metric.
 
-<details>
-<summary>Full results table (13 datasets × 5 methods)</summary>
+
+Full results table (13 datasets × 5 methods)
 
 | Dataset | Method | BGE N@20 | BGE R@20 | Qwen3 N@20 | Qwen3 R@20 | MiniLM-L6 N@20 | MiniLM-L6 R@20 |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -166,4 +166,4 @@ best result for a dataset, embedding model, and metric.
 | Amazon Video Games | SAE | 0.0531 | **0.1026** | 0.0469 | 0.0908 | 0.0418 | 0.0832 |
 | Amazon Video Games | D-SAE | **0.0542** | 0.1018 | **0.0527** | **0.1014** | **0.0426** | **0.0839** |
 
-</details>
+Full results are also in the file [sae_adaptors_results.csv](sae_adaptors_results.csv).
