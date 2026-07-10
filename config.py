@@ -12,7 +12,6 @@ DEVICE = "cuda:0"
 
 SBERT_MODELS = [
     {"name": "Qwen/Qwen3-Embedding-0.6B", "max_seq_length": 1024},
-    {"name": "nomic-ai/nomic-embed-text-v1.5", "max_seq_length": 1024},
     {"name": "sentence-transformers/all-mpnet-base-v2"},
     {"name": "BAAI/bge-base-en-v1.5"},
 ]
@@ -36,7 +35,7 @@ CONFIG = {
         "Toys_and_Games", "Video_Games", "Automotive", "Baby_Products",
         "Beauty_and_Personal_Care", "Clothing_Shoes_and_Jewelry",
         "Grocery_and_Gourmet_Food", "Health_and_Household", "Office_Products",
-        "Sports_and_Outdoors", "Electronics", "Books",
+        "Sports_and_Outdoors", "Electronics",
     )
 } | {
     "GoodBooks10k": {
